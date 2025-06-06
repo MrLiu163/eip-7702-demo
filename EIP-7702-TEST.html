@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EIP-7702 Wallet Upgrader</title>
+</head>
+<body>
+  <h2>EIP-7702 签名示例</h2>
+  <button id="connect">连接钱包</button>
+  <button id="sign">签名升级为 EIP-7702</button>
+  <p id="status"></p>
+
+  <script type="module">
+    import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.10.0/dist/ethers.min.js";
+
+    let provider;
+    let signer;
+    let address;
+
+    const status = document.getElementById("status");
+
+    document.getElementById("connect").onclick = async () => {
+      if (window.ethereum) {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        address = await signer.getAddress();
+        status.textContent = `钱包已连接: ${address}`;
+      } else {
+        alert("请使用支持 WalletConnect 或 MetaMask 的浏览器打开");
+      }
+    };
+
+    document.getElementById("sign").onclick = async () => {
+      if (!signer) {
+        alert("请先连接钱包");
+        return;
+      }
+
+      const message = `Upgrade EOA ${address} to EIP-7702 contract address at ${new Date().toISOString()}`;
+      const signature = await signer.signMessage(message);
+      status.textContent = `签名成功: ${signature}`;
+      console.log("Signature:", signature);
+    };
+  </script>
+</body>
+</html>
