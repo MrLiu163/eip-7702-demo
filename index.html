@@ -3,29 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>EIP-7702 Wallet Upgrader</title>
+  <title>Wallet 交互</title>
 </head>
 <body>
-  <h2>EIP-7702 签名示例</h2>
+  <h2>Wallet 交互操作</h2>
 
   <button id="connect">连接钱包</button>
   <button id="addPlasmaNetwork">➕ 添加 Plasma 网络</button>
   <button id="addPlasmaAccount">👤 添加 / 切换 Plasma 账户</button>
-  <button id="sign">签名升级为 EIP-7702</button>
+  <button id="sendUsdt">转 10 USDT</button>
+<!--  <button id="sign">签名升级为 EIP-7702</button>-->
 
   <p id="status"></p>
 
   <script type="module">
+    // ethers js library
     import { ethers } from "https://cdn.jsdelivr.net/npm/ethers@6.10.0/dist/ethers.min.js";
 
     let provider;
     let signer;
     let address;
-
+    
+    // 在页面中输出状态
     const status = document.getElementById("status");
     
+    // Plasma Info Params
     const PLASMA = {
-      chainId: "0x2611", // ✅ 填真实 Plasma chainId（十六进制），例如 "0x1234"
+      chainId: "0x2611",
       chainName: "Plasma",
       rpcUrls: ["https://plasma.drpc.org"],
       nativeCurrency: { name: "Plasma", symbol: "XPL", decimals: 18 },
@@ -36,7 +40,7 @@
     /* ---------- 连接钱包 ---------- */
     document.getElementById("connect").onclick = async () => {
       if (!window.ethereum) {
-        alert("请使用支持 EIP-1193 的钱包（MetaMask / imToken 等）");
+        alert("请使用支持的钱包（MetaMask / imToken 等）");
         return;
       }
 
@@ -45,7 +49,7 @@
       signer = await provider.getSigner();
       address = await signer.getAddress();
 
-      status.textContent = `钱包已连接: ${address}`;
+      status.textContent = `✅ 钱包已连接: ${address}`;
     };
 
     /* ---------- 添加 Plasma 网络 ---------- */
@@ -56,7 +60,7 @@
       });
     }
     document.getElementById("addPlasmaNetwork").onclick = async () => {
-        if (!window.ethereum) return alert("未检测到钱包");
+        if (!window.ethereum) return alert("⚠️ 未检测到钱包");
         try {
             await addPlasmaNetwork();
             status.textContent = "✅ Plasma 网络已添加（或已存在）";
@@ -74,7 +78,7 @@
       });
     }
     document.getElementById("addPlasmaAccount").onclick = async () => {
-        if (!window.ethereum) return alert("未检测到钱包");
+        if (!window.ethereum) return alert("⚠️ 未检测到钱包");
           try {
             // 先切换；如果钱包提示“未添加该链”，则自动 add 再 switch
             try {
@@ -96,7 +100,72 @@
             status.textContent = `❌ 切换 / 添加 Plasma 账户失败: ${err?.message || String(err)}`;
           }
     };
+      
+      // ====== USDT 转账按钮 ======
+      document.getElementById("sendUsdt").onclick = async () => {
+        try {
+          if (!signer || !provider) {
+            alert("请先连接钱包");
+            return;
+          }
 
+          const to = document.getElementById("usdtTo").value.trim();
+          if (!ethers.isAddress(to)) {
+            alert("收款地址不合法");
+            return;
+          }
+
+          // 填「当前链」的 USDT 合约地址
+          const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+          if (!ethers.isAddress(USDT_ADDRESS)) {
+            alert("请先填好 USDT 合约地址");
+            return;
+          }
+
+          // ERC20 ABI：只用到 transfer / decimals / symbol
+          const erc20Abi = [
+            "function transfer(address to, uint256 amount) returns (bool)",
+            "function decimals() view returns (uint8)",
+            "function symbol() view returns (string)",
+            "function balanceOf(address owner) view returns (uint256)",
+          ];
+
+          const usdt = new ethers.Contract(USDT_ADDRESS, erc20Abi, signer);
+
+          // USDT 通常 decimals=6，但别硬编码，直接读合约
+          const [decimals, symbol, from] = await Promise.all([
+            usdt.decimals(),
+            usdt.symbol(),
+            signer.getAddress(),
+          ]);
+
+          const amount = ethers.parseUnits("10", decimals);
+
+          // 可选：转账前检查余额，避免直接失败
+          const bal = await usdt.balanceOf(from);
+          if (bal < amount) {
+            status.textContent = `❌ 余额不足：当前 ${ethers.formatUnits(bal, decimals)} ${symbol}`;
+            return;
+          }
+
+          status.textContent = `正在发起交易：转 10 ${symbol} 到 ${to}…`;
+
+          // 发交易（会弹钱包确认）
+          const tx = await usdt.transfer(to, amount);
+
+          status.textContent = `交易已发送：${tx.hash}（等待确认…）`;
+          const receipt = await tx.wait();
+
+          status.textContent = receipt.status === 1
+            ? `✅ 成功：已转出 10 ${symbol}，tx=${tx.hash}`
+            : `❌ 失败：tx=${tx.hash}`;
+        } catch (err) {
+          console.error(err);
+          status.textContent = `❌ 转账失败: ${err?.shortMessage || err?.message || String(err)}`;
+        }
+      };
+      
+      
     /* ---------- EIP-7702 示例签名 ---------- */
     document.getElementById("sign").onclick = async () => {
       if (!signer) {
