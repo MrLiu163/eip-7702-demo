@@ -23,6 +23,15 @@
     let address;
 
     const status = document.getElementById("status");
+    
+    const PLASMA = {
+      chainId: "0x2611", // ✅ 填真实 Plasma chainId（十六进制），例如 "0x1234"
+      chainName: "Plasma",
+      rpcUrls: ["https://plasma.drpc.org"],
+      nativeCurrency: { name: "Plasma", symbol: "XPL", decimals: 18 },
+      blockExplorerUrls: ["https://plasmascan.to"],
+    };
+
 
     /* ---------- 连接钱包 ---------- */
     document.getElementById("connect").onclick = async () => {
@@ -40,69 +49,52 @@
     };
 
     /* ---------- 添加 Plasma 网络 ---------- */
+    async function addPlasmaNetwork() {
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [PLASMA],
+      });
+    }
     document.getElementById("addPlasmaNetwork").onclick = async () => {
-      if (!window.ethereum) {
-        alert("未检测到钱包");
-        return;
-      }
-
-      try {
-        await window.ethereum.request({
-          method: "wallet_addEthereumChain",
-          params: [
-            {
-              chainId: "0xPLASMA", // ⚠️ 替换为真实 Plasma chainId（16进制）
-              chainName: "Plasma",
-              rpcUrls: ["https://rpc.plasma.xyz"], // ⚠️ 示例 RPC
-              nativeCurrency: {
-                name: "Plasma",
-                symbol: "PLS",
-                decimals: 18
-              },
-              blockExplorerUrls: ["https://explorer.plasma.xyz"] // ⚠️ 示例
-            }
-          ]
-        });
-
-        status.textContent = "✅ Plasma 网络已添加（或已存在）";
-      } catch (err) {
-        console.error(err);
-        status.textContent = `❌ 添加 Plasma 网络失败: ${err.message}`;
-      }
+        if (!window.ethereum) return alert("未检测到钱包");
+        try {
+            await addPlasmaNetwork();
+            status.textContent = "✅ Plasma 网络已添加（或已存在）";
+        } catch (err) {
+            console.error(err);
+            status.textContent = `❌ 添加 Plasma 网络失败: ${err?.message || String(err)}`;
+        }
     };
 
     /* ---------- 添加 / 切换 Plasma 账户 ---------- */
+    async function switchToPlasma() {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: PLASMA.chainId }],
+      });
+    }
     document.getElementById("addPlasmaAccount").onclick = async () => {
-      if (!window.ethereum) {
-        alert("未检测到钱包");
-        return;
-      }
+        if (!window.ethereum) return alert("未检测到钱包");
+          try {
+            // 先切换；如果钱包提示“未添加该链”，则自动 add 再 switch
+            try {
+              await switchToPlasma();
+            } catch (e) {
+              // MetaMask 常见：4902 = Unrecognized chain
+              if (e?.code === 4902) {
+                await addPlasmaNetwork();
+                await switchToPlasma();
+              } else {
+                throw e;
+              }
+            }
 
-      try {
-        /**
-         * ⚠️ 重要说明：
-         * EVM 钱包没有“为某条链单独创建账户”的标准接口
-         * 实际做法是：
-         * 1. 切换到 Plasma 网络
-         * 2. 请求 accounts（钱包会自动派生该链下账户）
-         */
-
-        // 1. 切换到 Plasma 网络
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0xPLASMA" }] // ⚠️ 同上
-        });
-
-        // 2. 请求账户（确保该链下账户可用）
-        const accounts = await window.ethereum.request({
-          method: "eth_requestAccounts"
-        });
-
-        status.textContent = `✅ 已切换到 Plasma 网络，当前账户: ${accounts[0]}`;
-      } catch (err) {
-        console.error(err);
-        status.textContent = `❌ 切换 / 添加 Plasma 账户失败: ${err.message}`;
-      }
+            const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+            status.textContent = `✅ 已切换到 Plasma 网络，当前账户: ${accounts[0]}`;
+          } catch (err) {
+            console.error(err);
+            status.textContent = `❌ 切换 / 添加 Plasma 账户失败: ${err?.message || String(err)}`;
+          }
     };
 
     /* ---------- EIP-7702 示例签名 ---------- */
