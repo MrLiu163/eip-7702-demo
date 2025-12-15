@@ -11,6 +11,7 @@
   <button id="connect">连接钱包</button>
   <button id="addPlasmaNetwork">➕ 添加 Plasma 网络</button>
   <button id="addPlasmaAccount">👤 添加 / 切换 Plasma 账户</button>
+  <input id="usdtTo" placeholder="收款地址 0x..." style="width:420px;" />
   <button id="sendUsdt">转 10 USDT</button>
 <!--  <button id="sign">签名升级为 EIP-7702</button>-->
 
@@ -106,6 +107,18 @@
         try {
           if (!signer || !provider) {
             alert("请先连接钱包");
+            return;
+          }
+          
+          const toInput = document.getElementById("usdtTo");
+          if (!toInput) {
+            status.textContent = "❌ 页面缺少收款地址输入框（id=usdtTo）。请确认已把 <input id='usdtTo'> 加到 HTML 里。";
+            return;
+          }
+
+          const to = (toInput.value || "").trim();
+          if (!ethers.isAddress(to)) {
+            alert("收款地址不合法");
             return;
           }
 
