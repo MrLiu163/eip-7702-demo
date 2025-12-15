@@ -36,7 +36,14 @@
       nativeCurrency: { name: "Plasma", symbol: "XPL", decimals: 18 },
       blockExplorerUrls: ["https://plasmascan.to"],
     };
-
+      
+    // USDT Contract Address
+    const USDT_BY_CHAIN = {
+        1:  "0xdAC17F958D2ee523a2206206994597C13D831ec7", // Ethereum Mainnet USDT
+        42161: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", // Arbitrum One USDT
+        10: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58", // Optimism USDT
+        9745: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb", // Plasma USDT
+    };
 
     /* ---------- 连接钱包 ---------- */
     document.getElementById("connect").onclick = async () => {
@@ -108,6 +115,14 @@
           if (!signer || !provider) {
             alert("请先连接钱包");
             return;
+          }
+          
+          const network = await provider.getNetwork();
+          status.textContent = `当前网络 chainId=${network.chainId}`;
+          
+          const USDT_ADDRESS = USDT_BY_CHAIN[Number(network.chainId)];
+          if (!USDT_ADDRESS) {
+            throw new Error(`⚠️ 当前链(chainId=${net.chainId}) 未配置 USDT 地址，无法转 USDT`);
           }
           
           const toInput = document.getElementById("usdtTo");
