@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -7,8 +7,12 @@
 </head>
 <body>
   <h2>EIP-7702 签名示例</h2>
+
   <button id="connect">连接钱包</button>
+  <button id="addPlasmaNetwork">➕ 添加 Plasma 网络</button>
+  <button id="addPlasmaAccount">👤 添加 / 切换 Plasma 账户</button>
   <button id="sign">签名升级为 EIP-7702</button>
+
   <p id="status"></p>
 
   <script type="module">
@@ -20,18 +24,88 @@
 
     const status = document.getElementById("status");
 
+    /* ---------- 连接钱包 ---------- */
     document.getElementById("connect").onclick = async () => {
-      if (window.ethereum) {
-        provider = new ethers.BrowserProvider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        signer = await provider.getSigner();
-        address = await signer.getAddress();
-        status.textContent = `钱包已连接: ${address}`;
-      } else {
-        alert("请使用支持 WalletConnect 或 MetaMask 的浏览器打开");
+      if (!window.ethereum) {
+        alert("请使用支持 EIP-1193 的钱包（MetaMask / imToken 等）");
+        return;
+      }
+
+      provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = await provider.getSigner();
+      address = await signer.getAddress();
+
+      status.textContent = `钱包已连接: ${address}`;
+    };
+
+    /* ---------- 添加 Plasma 网络 ---------- */
+    document.getElementById("addPlasmaNetwork").onclick = async () => {
+      if (!window.ethereum) {
+        alert("未检测到钱包");
+        return;
+      }
+
+      try {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: "0xPLASMA", // ⚠️ 替换为真实 Plasma chainId（16进制）
+              chainName: "Plasma",
+              rpcUrls: ["https://rpc.plasma.xyz"], // ⚠️ 示例 RPC
+              nativeCurrency: {
+                name: "Plasma",
+                symbol: "PLS",
+                decimals: 18
+              },
+              blockExplorerUrls: ["https://explorer.plasma.xyz"] // ⚠️ 示例
+            }
+          ]
+        });
+
+        status.textContent = "✅ Plasma 网络已添加（或已存在）";
+      } catch (err) {
+        console.error(err);
+        status.textContent = `❌ 添加 Plasma 网络失败: ${err.message}`;
       }
     };
 
+    /* ---------- 添加 / 切换 Plasma 账户 ---------- */
+    document.getElementById("addPlasmaAccount").onclick = async () => {
+      if (!window.ethereum) {
+        alert("未检测到钱包");
+        return;
+      }
+
+      try {
+        /**
+         * ⚠️ 重要说明：
+         * EVM 钱包没有“为某条链单独创建账户”的标准接口
+         * 实际做法是：
+         * 1. 切换到 Plasma 网络
+         * 2. 请求 accounts（钱包会自动派生该链下账户）
+         */
+
+        // 1. 切换到 Plasma 网络
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xPLASMA" }] // ⚠️ 同上
+        });
+
+        // 2. 请求账户（确保该链下账户可用）
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts"
+        });
+
+        status.textContent = `✅ 已切换到 Plasma 网络，当前账户: ${accounts[0]}`;
+      } catch (err) {
+        console.error(err);
+        status.textContent = `❌ 切换 / 添加 Plasma 账户失败: ${err.message}`;
+      }
+    };
+
+    /* ---------- EIP-7702 示例签名 ---------- */
     document.getElementById("sign").onclick = async () => {
       if (!signer) {
         alert("请先连接钱包");
@@ -40,6 +114,7 @@
 
       const message = `Upgrade EOA ${address} to EIP-7702 contract address at ${new Date().toISOString()}`;
       const signature = await signer.signMessage(message);
+
       status.textContent = `签名成功: ${signature}`;
       console.log("Signature:", signature);
     };
